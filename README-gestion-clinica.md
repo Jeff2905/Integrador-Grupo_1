@@ -1,4 +1,4 @@
-# Sistema de Gestión de Clientes — Clínica Odontológica
+# Sistema de Gestión de Citas de Clientes — Clínica Odontológica
 
 Análisis de negocio, matriz de requerimientos y cronograma del proyecto, basados en las historias de usuario (HU) definidas por el equipo.
 
