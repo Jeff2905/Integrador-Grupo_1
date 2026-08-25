@@ -1,4 +1,4 @@
-# DentalFlow — Front-End
+# Odam — Front-End
 
 Versión inicial del Front-End del sistema de gestión de clientes para la clínica odontológica, correspondiente a la **Parte 2** del taller (Estructura Front-End & WPO).
 
