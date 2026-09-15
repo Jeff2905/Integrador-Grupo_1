@@ -12,11 +12,14 @@ document.addEventListener("DOMContentLoaded", () => {
       const isHidden = passwordInput.type === "password";
       passwordInput.type = isHidden ? "text" : "password";
       togglePassword.textContent = isHidden ? "Ocultar" : "Ver";
-      togglePassword.setAttribute("aria-label", isHidden ? "Ocultar contraseña" : "Mostrar contraseña");
+      togglePassword.setAttribute(
+        "aria-label",
+        isHidden ? "Ocultar contraseña" : "Mostrar contraseña"
+      );
     });
   }
 
-  // Validación básica de envío (placeholder — reemplazar por la llamada real a la API de autenticación, RF-02)
+  // Inicio de sesión
   if (form) {
     form.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -29,8 +32,59 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      // TODO: reemplazar por la llamada real al endpoint de autenticación (RF-02)
-      console.log("Intento de inicio de sesión:", { email });
+      // Conexión con Spring Boot
+      fetch("http://localhost:8081/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email: email,
+          password: password
+        })
+      })
+      .then(response => response.text())
+      .then(resultado => {
+
+        console.log("Respuesta del servidor:", resultado);
+
+        if (resultado === "Inicio de sesión correcto") {
+          alert("Inicio de sesión correcto");
+        } else {
+          alert("Correo o contraseña incorrectos");
+        }
+
+      })
+      .catch(error => {
+        console.error("Error de conexión:", error);
+        alert("No se pudo conectar con el servidor");
+      });
     });
   }
 });
+
+
+// CONEXIÓN CON SPRING BOOT - PACIENTES
+
+
+const API_URL = "http://localhost:8081/api/pacientes";
+
+async function cargarPacientes() {
+  try {
+    const respuesta = await fetch(API_URL);
+
+    if (!respuesta.ok) {
+      throw new Error("No se pudieron obtener los pacientes");
+    }
+
+    const pacientes = await respuesta.json();
+
+    console.log("✅ Pacientes obtenidos desde Spring Boot:");
+    console.table(pacientes);
+
+  } catch (error) {
+    console.error("❌ Error al conectar con Spring Boot:", error);
+  }
+}
+
+cargarPacientes();
