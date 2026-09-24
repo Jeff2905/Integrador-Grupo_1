@@ -21,14 +21,19 @@ public class JwtService {
             SECRET.getBytes(StandardCharsets.UTF_8)
     );
 
-    public String generarToken(Integer idUsuario, String correo, Integer idRol) {
+    public String generarToken(
+            Integer idUsuario,
+            String correo,
+            Integer idRol) {
 
         return Jwts.builder()
                 .subject(correo)
                 .claim("idUsuario", idUsuario)
                 .claim("idRol", idRol)
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + EXPIRATION))
+                .expiration(
+                        new Date(System.currentTimeMillis() + EXPIRATION)
+                )
                 .signWith(key)
                 .compact();
     }
@@ -41,6 +46,22 @@ public class JwtService {
                 .parseSignedClaims(token)
                 .getPayload()
                 .getSubject();
+    }
+
+    public Integer extraerIdRol(String token) {
+
+        Object valor = Jwts.parser()
+                .verifyWith(key)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload()
+                .get("idRol");
+
+        if (valor instanceof Number) {
+            return ((Number) valor).intValue();
+        }
+
+        return null;
     }
 
     public boolean validarToken(String token) {
