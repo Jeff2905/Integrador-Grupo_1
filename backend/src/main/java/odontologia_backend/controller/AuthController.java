@@ -1,108 +1,83 @@
 package odontologia_backend.controller;
 
-import odontologia_backend.config.JwtService;
 import odontologia_backend.entity.Usuario;
 import odontologia_backend.repository.UsuarioRepository;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import odontologia_backend.config.JwtUtil;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
 @CrossOrigin(origins = "*")
 public class AuthController {
 
-    private final UsuarioRepository usuarioRepository;
-    private final PasswordEncoder passwordEncoder;
-    private final JwtService jwtService;
+    @Autowired
+    private UsuarioRepository usuarioRepository;
 
-    public AuthController(
-            UsuarioRepository usuarioRepository,
-            PasswordEncoder passwordEncoder,
-            JwtService jwtService) {
+    @Autowired
+    private BCryptPasswordEncoder passwordEncoder;
 
-        this.usuarioRepository = usuarioRepository;
-        this.passwordEncoder = passwordEncoder;
-        this.jwtService = jwtService;
-    }
+    @Autowired
+    private JwtUtil jwtUtil;
 
-    @PostMapping("/login")
-    public LoginResponse login(@RequestBody LoginRequest datos) {
-
-        Usuario usuario = usuarioRepository
-                .findByCorreo(datos.email())
-                .orElse(null);
-
-        if (usuario == null) {
-            throw new RuntimeException("Correo o contraseña incorrectos");
-        }
-
-        if (!usuario.getEstado()) {
-            throw new RuntimeException("Usuario inactivo");
-        }
-
-        if (!passwordEncoder.matches(
-                datos.password(),
-                usuario.getContrasena())) {
-
-            throw new RuntimeException("Correo o contraseña incorrectos");
-        }
-
-        String token = jwtService.generarToken(
-                usuario.getIdUsuario(),
-                usuario.getCorreo(),
-                usuario.getIdRol()
-        );
-
-        return new LoginResponse(
-                "Inicio de sesión correcto",
-                token,
-                usuario.getIdUsuario(),
-                usuario.getNombreUsuario(),
-                usuario.getIdRol()
-        );
-    }
-
+    // ============================
+    // REGISTRO DE USUARIO
+    // ============================
     @PostMapping("/registro")
-    public String registro(@RequestBody RegistroRequest datos) {
+    public ResponseEntity<?> registro(@RequestBody Usuario usuario) {
+        Map<String, Object> respuesta = new HashMap<>();
 
-        if (usuarioRepository.findByCorreo(datos.correo()).isPresent()) {
-            return "El correo ya está registrado";
+        // Verificar si el correo ya existe
+        if (usuarioRepository.findByCorreo(usuario.getCorreo()).isPresent()) {
+            respuesta.put("mensaje", "El correo ya está registrado");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(respuesta);
         }
 
-        Usuario usuario = new Usuario();
+        // Encriptar la contraseña con BCrypt
+        usuario.setContrasena(passwordEncoder.encode(usuario.getContrasena()));
 
-        usuario.setNombreUsuario(datos.nombreUsuario());
-        usuario.setCorreo(datos.correo());
-
-        usuario.setContrasena(
-                passwordEncoder.encode(datos.password())
-        );
-
-        usuario.setEstado(true);
-        usuario.setIdRol(datos.idRol());
-
+        // Guardar el usuario
         usuarioRepository.save(usuario);
 
-        return "Usuario registrado correctamente";
+        respuesta.put("mensaje", "Usuario registrado correctamente");
+        return ResponseEntity.ok(respuesta);
     }
 
-    public record LoginRequest(
-            String email,
-            String password
-    ) {}
+    // ============================
+    // LOGIN DE USUARIO
+    // ============================
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody Map<String, String> credenciales) {
+        Map<String, Object> respuesta = new HashMap<>();
 
-    public record RegistroRequest(
-            String nombreUsuario,
-            String correo,
-            String password,
-            Integer idRol
-    ) {}
+        String email = credenciales.get("email");
+        String password = credenciales.get("password");
 
-    public record LoginResponse(
-            String mensaje,
-            String token,
-            Integer idUsuario,
-            String nombreUsuario,
-            Integer idRol
-    ) {}
+        // Buscar usuario por correo
+        Usuario usuario = usuarioRepository.findByCorreo(email).orElse(null);
+
+        // Validar credenciales
+        if (usuario == null || !passwordEncoder.matches(password, usuario.getContrasena())) {
+            respuesta.put("mensaje", "Correo o contraseña incorrectos");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(respuesta);
+        }
+
+        // Generar token JWT
+        String token = jwtUtil.generateToken(usuario.getCorreo(), usuario.getIdRol());
+
+        // Respuesta exitosa
+        respuesta.put("mensaje", "Inicio de sesión correcto");
+        respuesta.put("token", token);
+        respuesta.put("idUsuario", usuario.getIdUsuario());
+        respuesta.put("nombreUsuario", usuario.getNombreUsuario());
+        respuesta.put("idRol", usuario.getIdRol());
+
+        return ResponseEntity.ok(respuesta);
+    }
 }
