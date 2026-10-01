@@ -2,52 +2,82 @@ package odontologia_backend.controller;
 
 import odontologia_backend.entity.Usuario;
 import odontologia_backend.repository.UsuarioRepository;
+import odontologia_backend.config.JwtUtil;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
 @CrossOrigin(origins = "*")
 public class AuthController {
 
-    private final UsuarioRepository usuarioRepository;
+    @Autowired
+    private UsuarioRepository usuarioRepository;
 
-    public AuthController(UsuarioRepository usuarioRepository) {
-        this.usuarioRepository = usuarioRepository;
+    @Autowired
+    private BCryptPasswordEncoder passwordEncoder;
+
+    @Autowired
+    private JwtUtil jwtUtil;
+
+    // ============================
+    // REGISTRO DE USUARIO
+    // ============================
+    @PostMapping("/registro")
+    public ResponseEntity<?> registro(@RequestBody Usuario usuario) {
+        Map<String, Object> respuesta = new HashMap<>();
+
+        // Verificar si el correo ya existe
+        if (usuarioRepository.findByCorreo(usuario.getCorreo()).isPresent()) {
+            respuesta.put("mensaje", "El correo ya está registrado");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(respuesta);
+        }
+
+        // Encriptar la contraseña con BCrypt
+        usuario.setContrasena(passwordEncoder.encode(usuario.getContrasena()));
+
+        // Guardar el usuario
+        usuarioRepository.save(usuario);
+
+        respuesta.put("mensaje", "Usuario registrado correctamente");
+        return ResponseEntity.ok(respuesta);
     }
 
+    // ============================
+    // LOGIN DE USUARIO
+    // ============================
     @PostMapping("/login")
-    public String login(@RequestBody LoginRequest datos) {
+    public ResponseEntity<?> login(@RequestBody Map<String, String> credenciales) {
+        Map<String, Object> respuesta = new HashMap<>();
 
-        Usuario usuario = usuarioRepository.findByCorreo(datos.email())
-                .orElse(null);
+        String email = credenciales.get("email");
+        String password = credenciales.get("password");
 
-        System.out.println("Correo recibido: " + datos.email());
-        System.out.println("Contraseña recibida: " + datos.password());
+        // Buscar usuario por correo
+        Usuario usuario = usuarioRepository.findByCorreo(email).orElse(null);
 
-        if (usuario == null) {
-            System.out.println("❌ Usuario NO encontrado");
-            return "Correo o contraseña incorrectos";
+        // Validar credenciales
+        if (usuario == null || !passwordEncoder.matches(password, usuario.getContrasena())) {
+            respuesta.put("mensaje", "Correo o contraseña incorrectos");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(respuesta);
         }
 
-        System.out.println("Usuario encontrado: " + usuario.getNombreUsuario());
-        System.out.println("Contraseña BD: " + usuario.getContrasena());
+        // Generar token JWT
+        String token = jwtUtil.generateToken(usuario.getCorreo(), usuario.getIdRol());
 
-        if (!usuario.getContrasena().equals(datos.password())) {
-            return "Correo o contraseña incorrectos";
-        }
+        // Respuesta exitosa
+        respuesta.put("mensaje", "Inicio de sesión correcto");
+        respuesta.put("token", token);
+        respuesta.put("idUsuario", usuario.getIdUsuario());
+        respuesta.put("nombreUsuario", usuario.getNombreUsuario());
+        respuesta.put("idRol", usuario.getIdRol());
 
-        if (!usuario.getEstado()) {
-            return "Usuario inactivo";
-        }
-
-        System.out.println("Usuario autenticado: " + usuario.getNombreUsuario());
-        System.out.println("Rol: " + usuario.getIdRol());
-
-        return "Inicio de sesión correcto";
+        return ResponseEntity.ok(respuesta);
     }
-
-    public record LoginRequest(
-            String email,
-            String password
-    ) {}
 }
