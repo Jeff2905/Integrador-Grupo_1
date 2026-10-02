@@ -2,6 +2,7 @@ package odontologia_backend.config;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
@@ -11,15 +12,17 @@ import java.util.Date;
 @Service
 public class JwtService {
 
-    private static final String SECRET =
-            "ODAM-Clinica-Odontologica-Secret-Key-2026-Seguridad-JWT";
+    @Value("${JWT_SECRET}")
+    private String secret;
 
     private static final long EXPIRATION =
             1000 * 60 * 60; // 1 hora
 
-    private final SecretKey key = Keys.hmacShaKeyFor(
-            SECRET.getBytes(StandardCharsets.UTF_8)
-    );
+    private SecretKey getKey() {
+        return Keys.hmacShaKeyFor(
+                secret.getBytes(StandardCharsets.UTF_8)
+        );
+    }
 
     public String generarToken(
             Integer idUsuario,
@@ -34,14 +37,14 @@ public class JwtService {
                 .expiration(
                         new Date(System.currentTimeMillis() + EXPIRATION)
                 )
-                .signWith(key)
+                .signWith(getKey())
                 .compact();
     }
 
     public String extraerCorreo(String token) {
 
         return Jwts.parser()
-                .verifyWith(key)
+                .verifyWith(getKey())
                 .build()
                 .parseSignedClaims(token)
                 .getPayload()
@@ -51,7 +54,7 @@ public class JwtService {
     public Integer extraerIdRol(String token) {
 
         Object valor = Jwts.parser()
-                .verifyWith(key)
+                .verifyWith(getKey())
                 .build()
                 .parseSignedClaims(token)
                 .getPayload()
@@ -68,7 +71,7 @@ public class JwtService {
 
         try {
             Jwts.parser()
-                    .verifyWith(key)
+                    .verifyWith(getKey())
                     .build()
                     .parseSignedClaims(token);
 
